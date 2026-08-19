@@ -1,0 +1,11 @@
+# Segredos
+.env
+
+# Banco de dados local (protótipo)
+*.db
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/

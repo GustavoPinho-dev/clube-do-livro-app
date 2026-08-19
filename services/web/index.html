@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Catálogo de Leituras</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,600;1,600&family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;500&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="wrap">
+
+    <header class="ledger-header">
+      <p class="ledger-eyebrow">Fichário pessoal · vol. 1</p>
+      <h1 class="ledger-title">Catálogo de Leituras</h1>
+      <p class="ledger-sub">Busque um livro, arquive na ficha e organize por gaveta de leitura.</p>
+    </header>
+
+    <div id="connection-banner"></div>
+
+    <section class="search-slip" aria-label="Busca de livros">
+      <label class="search-slip-label" for="search-input">Buscar na Google Books</label>
+      <div class="search-row">
+        <input type="text" id="search-input" placeholder="Título, autor ou assunto…" autocomplete="off">
+        <button class="btn" id="search-btn" type="button">Buscar</button>
+      </div>
+    </section>
+
+    <div id="search-feedback"></div>
+
+    <section class="results" id="results" aria-live="polite"></section>
+
+    <section aria-label="Lista de leitura">
+      <div class="drawers" role="tablist" id="drawer-tabs">
+        <button class="drawer-tab active" role="tab" data-status="">Todos</button>
+        <button class="drawer-tab" role="tab" data-status="quero_ler">Quero ler</button>
+        <button class="drawer-tab" role="tab" data-status="lendo">Lendo</button>
+        <button class="drawer-tab" role="tab" data-status="lido">Lido</button>
+      </div>
+      <div class="drawer-panel" id="list-panel" aria-live="polite"></div>
+    </section>
+
+  </div>
+
+  <!-- config.js define API_BASE_URL: é o único "acoplamento" entre os dois
+       serviços, e é só uma URL configurável, não código compartilhado. -->
+  <script src="config.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>

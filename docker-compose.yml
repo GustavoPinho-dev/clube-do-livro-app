@@ -1,0 +1,31 @@
+# docker-compose.yml
+#
+# Ilustra os dois serviços como containers independentes: cada um com seu
+# próprio processo, filesystem e ciclo de vida. Eles só se enxergam pela
+# rede (HTTP), nunca por import de código ou memória compartilhada.
+#
+# Rodar: docker compose up
+# Parar um serviço sem afetar o outro: docker compose stop api
+
+services:
+  api:
+    build: ./services/api
+    ports:
+      - "5001:5001"
+    environment:
+      - GOOGLE_BOOKS_API_KEY=${GOOGLE_BOOKS_API_KEY}
+      - API_PORT=${API_PORT}
+      - CORS_ORIGINS=${CORS_ORIGINS}
+    volumes:
+      - api-data:/app/data   # onde o books.db pode viver, se você separar o caminho
+
+  web:
+    build: ./services/web
+    ports:
+      - "8000:8000"
+    # Repare: "web" não depende de "api" para subir. Se comentar/remover o
+    # serviço "api" inteiro, "web" continua rodando (só a busca/salvar
+    # não vai funcionar, com aviso claro na tela).
+
+volumes:
+  api-data:
