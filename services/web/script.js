@@ -1,7 +1,8 @@
 // ---------------------------------------------------------------
-// Catálogo de Leituras — lógica da interface
+// Catálogo de Leituras — lógica da interface (página inicial)
 // Fala com o backend Flask (app.py), que por sua vez usa
 // fetch_books.py / db.py / reading_list.py.
+// Utilitários compartilhados (apiFetch, escapeHtml, etc.) vêm de common.js.
 // ---------------------------------------------------------------
 
 const searchInput = document.getElementById("search-input");
@@ -11,134 +12,8 @@ const resultsEl = document.getElementById("results");
 const listPanel = document.getElementById("list-panel");
 const drawerTabs = document.getElementById("drawer-tabs");
 const connectionBanner = document.getElementById("connection-banner");
-const bookModal = document.getElementById("book-modal");
-const bookModalCard = bookModal.querySelector(".book-modal-card");
-const bookModalContent = document.getElementById("book-modal-content");
-
-const STATUS_LABELS = {
-  quero_ler: "Quero ler",
-  lendo: "Lendo",
-  lido: "Lido",
-};
 
 let currentStatusFilter = "";
-let lastFocusedElement = null;
-
-// ---------------- utilidades ----------------
-
-function escapeHtml(str) {
-  const div = document.createElement("div");
-  div.textContent = str ?? "";
-  return div.innerHTML;
-}
-
-function showFeedback(container, message, type = "error") {
-  container.innerHTML = `<div class="${type === "error" ? "error-banner" : "loading"}">${escapeHtml(message)}</div>`;
-}
-
-function clearFeedback(container) {
-  container.innerHTML = "";
-}
-
-async function apiFetch(path, options = {}) {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    headers: { "Content-Type": "application/json" },
-    ...options,
-  });
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    throw new Error(data.error || `Erro ${response.status}`);
-  }
-  return data;
-}
-
-async function checkApiConnection() {
-  try {
-    await apiFetch("/health");
-    connectionBanner.innerHTML = "";
-  } catch (err) {
-    connectionBanner.innerHTML = `<div class="error-banner">Não foi possível conectar à API em ${API_BASE_URL}. Verifique se o serviço está rodando.</div>`;
-  }
-}
-
-
-function formatValue(value, fallback = "Não informado") {
-  return value ? escapeHtml(value) : fallback;
-}
-
-function formatDate(dateValue) {
-  if (!dateValue) return "Não informado";
-  const date = new Date(dateValue);
-  if (Number.isNaN(date.getTime())) return escapeHtml(dateValue);
-  return new Intl.DateTimeFormat("pt-BR", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(date);
-}
-
-function renderStars(rating) {
-  const value = rating || 0;
-  return [1, 2, 3, 4, 5].map((n) => (n <= value ? "★" : "☆")).join("");
-}
-
-function openBookModal(livro) {
-  lastFocusedElement = document.activeElement;
-
-  const coverHtml = livro.cover_url
-    ? `<img class="book-detail-cover" src="${escapeHtml(livro.cover_url)}" alt="Capa de ${escapeHtml(livro.title)}">`
-    : `<div class="book-detail-cover-placeholder" aria-hidden="true">?</div>`;
-
-  bookModalContent.innerHTML = `
-    <div class="book-detail">
-      <div>${coverHtml}</div>
-      <div>
-        <p class="book-detail-kicker">Ficha catalográfica</p>
-        <h2 class="book-detail-title" id="book-modal-title">${escapeHtml(livro.title)}</h2>
-        <span class="stamp stamp-${livro.status}">${STATUS_LABELS[livro.status]}</span>
-        <div class="book-detail-meta">
-          <div class="book-detail-field">
-            <span class="book-detail-label">Autor(es)</span>
-            <p class="book-detail-value">${formatValue(livro.authors)}</p>
-          </div>
-          <div class="book-detail-field">
-            <span class="book-detail-label">Ano de publicação</span>
-            <p class="book-detail-value">${formatValue(livro.first_publish_year)}</p>
-          </div>
-          <div class="book-detail-field">
-            <span class="book-detail-label">ISBN</span>
-            <p class="book-detail-value">${formatValue(livro.isbn)}</p>
-          </div>
-          <div class="book-detail-field">
-            <span class="book-detail-label">Avaliação</span>
-            <p class="book-detail-value" aria-label="${livro.rating || 0} de 5 estrelas">${renderStars(livro.rating)}</p>
-          </div>
-          <div class="book-detail-field">
-            <span class="book-detail-label">Adicionado em</span>
-            <p class="book-detail-value">${formatDate(livro.added_at)}</p>
-          </div>
-          <div class="book-detail-field">
-            <span class="book-detail-label">Última atualização</span>
-            <p class="book-detail-value">${formatDate(livro.updated_at)}</p>
-          </div>
-        </div>
-      </div>
-    </div>
-  `;
-
-  bookModal.hidden = false;
-  document.body.style.overflow = "hidden";
-  bookModalCard.focus();
-}
-
-function closeBookModal() {
-  bookModal.hidden = true;
-  bookModalContent.innerHTML = "";
-  document.body.style.overflow = "";
-  lastFocusedElement?.focus();
-}
 
 // ---------------- busca ----------------
 
@@ -184,13 +59,28 @@ function renderSearchCard(livro) {
   card.innerHTML = `
     ${coverHtml}
     <div class="card-body">
-      <p class="card-title">${escapeHtml(livro.title)}</p>
+      <button type="button" class="card-title link-title">${escapeHtml(livro.title)}</button>
       <p class="card-meta">${escapeHtml(autores)}${ano}</p>
     </div>
     <div class="card-actions">
       <button class="btn btn-small save-btn" type="button">Salvar na lista</button>
     </div>
   `;
+
+  // Clicar no título salva o livro (se ainda não estiver salvo) e abre a
+  // página de detalhes. Isso não adiciona o livro a nenhuma gaveta --
+  // só garante que ele exista no banco para termos um id a consultar.
+  card.querySelector(".link-title").addEventListener("click", async () => {
+    try {
+      const { book_id } = await apiFetch("/api/books", {
+        method: "POST",
+        body: JSON.stringify(livro),
+      });
+      window.location.href = `book.html?id=${book_id}`;
+    } catch (err) {
+      showFeedback(searchFeedback, err.message);
+    }
+  });
 
   const saveBtn = card.querySelector(".save-btn");
   saveBtn.addEventListener("click", async () => {
@@ -246,7 +136,7 @@ function renderList(livros) {
 
 function renderListItem(livro) {
   const item = document.createElement("div");
-  item.className = "list-item list-item-clickable";
+  item.className = "list-item";
 
   const autores = livro.authors || "";
   const ano = livro.first_publish_year ? ` · ${livro.first_publish_year}` : "";
@@ -269,22 +159,19 @@ function renderListItem(livro) {
   item.innerHTML = `
     <span class="stamp stamp-${livro.status}">${STATUS_LABELS[livro.status]}</span>
     <div class="list-item-body">
-      <button class="list-item-detail-btn" type="button" aria-label="Ver detalhes de ${escapeHtml(livro.title)}">
-        <p class="list-item-title">${escapeHtml(livro.title)}</p>
-        <p class="list-item-meta">${escapeHtml(autores)}${ano}</p>
-      </button>
+      <button type="button" class="list-item-title link-title">${escapeHtml(livro.title)}</button>
+      <p class="list-item-meta">${escapeHtml(autores)}${ano}</p>
     </div>
-    <button class="btn btn-small btn-ghost details-btn" type="button" aria-label="Ver detalhes de ${escapeHtml(livro.title)}">Ver detalhes</button>
     <div class="rating" role="group" aria-label="Avaliação">${starsHtml}</div>
     <select class="status-select" aria-label="Mudar status">${statusOptions}</select>
     <button class="remove-btn" type="button" aria-label="Remover da lista">×</button>
   `;
 
-  item.addEventListener("click", (e) => {
-    if (e.target.closest("button, select")) return;
-    openBookModal(livro);
+  // Título leva aos detalhes -- aqui o livro já tem book_id garantido
+  // (está na lista), então não precisa salvar de novo antes de navegar.
+  item.querySelector(".link-title").addEventListener("click", () => {
+    window.location.href = `book.html?id=${livro.book_id}`;
   });
-  item.querySelector(".details-btn").addEventListener("click", () => openBookModal(livro));
 
   // Avaliação por estrelas
   item.querySelectorAll(".rating button").forEach((btn) => {
@@ -328,14 +215,6 @@ function renderListItem(livro) {
   return item;
 }
 
-bookModal.addEventListener("click", (e) => {
-  if (e.target.matches("[data-close-modal]")) closeBookModal();
-});
-
-document.addEventListener("keydown", (e) => {
-  if (e.key === "Escape" && !bookModal.hidden) closeBookModal();
-});
-
 // ---------------- gavetas (filtro por status) ----------------
 
 drawerTabs.addEventListener("click", (e) => {
@@ -355,5 +234,5 @@ searchInput.addEventListener("keydown", (e) => {
   if (e.key === "Enter") runSearch();
 });
 
-checkApiConnection();
+checkApiConnection(connectionBanner);
 loadList();

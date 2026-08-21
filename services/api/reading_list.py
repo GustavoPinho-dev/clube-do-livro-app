@@ -122,11 +122,9 @@ def get_list(conn, status: str = None) -> list[dict]:
     query = """
         SELECT
             b.id AS book_id,
+            b.source_id,
             b.title,
             b.first_publish_year,
-            b.isbn,
-            b.cover_url,
-            b.source_api,
             GROUP_CONCAT(a.name, ', ') AS authors,
             ul.status,
             ul.rating,
@@ -180,7 +178,7 @@ def remove_book_from_list(book_id: int, db_path: str = DB_PATH):
 
 if __name__ == "__main__":
     # Demonstração rápida usando o livro de exemplo criado por db.py
-    from services.api.db import init_db, save_books
+    from db import init_db, save_books
 
     init_db()
     save_books([

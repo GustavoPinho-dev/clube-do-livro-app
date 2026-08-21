@@ -23,8 +23,8 @@ from flask_cors import CORS
 from dotenv import load_dotenv
 import requests as requests_lib
 
-from fetch_books import search_and_normalize
-from db import init_db, save_book
+from fetch_books import search_and_normalize, get_and_normalize_volume
+from db import init_db, save_book, get_book_detail, get_book_detail_by_source_id
 from reading_list import (
     add_book_to_list,
     rate_book,
@@ -79,6 +79,68 @@ def api_save_book():
     init_db()
     book_id = save_book(book)
     return jsonify({"book_id": book_id}), 201
+
+
+@app.route("/api/books/<int:book_id>")
+def api_get_book(book_id):
+    init_db()
+    livro = get_book_detail(book_id)
+
+    if livro is None:
+        return jsonify({"error": f"Livro id={book_id} não encontrado."}), 404
+
+    return jsonify(_normalize_book_response(livro))
+
+
+@app.route("/api/volumes/<path:source_id>")
+def api_get_volume(source_id):
+    """
+    Detalhes de um livro identificados pelo id da Google Books (source_id).
+    Diferente de /api/books/<id>, esse endpoint funciona mesmo para livros
+    que o usuário ainda não salvou: nesse caso, busca ao vivo na Google
+    Books e retorna com book_id=None (indicando "ainda não está na lista").
+    """
+    init_db()
+
+    livro = get_book_detail_by_source_id(source_id)
+    if livro is not None:
+        return jsonify(_normalize_book_response(livro))
+
+    # Não está salvo ainda -> busca direto na Google Books
+    try:
+        livro = get_and_normalize_volume(source_id)
+    except requests_lib.exceptions.HTTPError as e:
+        return jsonify({"error": f"Erro ao consultar a Google Books API: {e}"}), 502
+    except requests_lib.exceptions.RequestException as e:
+        return jsonify({"error": f"Falha de conexão: {e}"}), 502
+
+    if livro is None:
+        return jsonify({"error": f"Volume '{source_id}' não encontrado."}), 404
+
+    livro.update({"book_id": None, "status": None, "rating": None})
+    return jsonify(_normalize_book_response(livro))
+
+
+def _normalize_book_response(livro: dict) -> dict:
+    """
+    Deixa a resposta de detalhes consistente com o resto da API:
+    - 'id' (coluna interna do banco) vira 'book_id', igual aos outros
+      endpoints (/api/list, /api/books POST).
+    - 'categories' sempre chega como lista, venha do banco (string
+      'a, b') ou direto da Google Books (já é lista).
+    """
+    livro = dict(livro)
+
+    if "id" in livro:
+        livro["book_id"] = livro.pop("id")
+
+    categories = livro.get("categories")
+    if isinstance(categories, str):
+        livro["categories"] = [c.strip() for c in categories.split(",") if c.strip()]
+    elif categories is None:
+        livro["categories"] = []
+
+    return livro
 
 
 @app.route("/api/list")

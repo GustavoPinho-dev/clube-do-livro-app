@@ -26,6 +26,11 @@ CREATE TABLE IF NOT EXISTS books (
     first_publish_year INTEGER,
     cover_url TEXT,
     source_api TEXT,
+    description TEXT,
+    publisher TEXT,
+    page_count INTEGER,
+    categories TEXT,                -- categorias separadas por vírgula
+    average_rating REAL,            -- avaliação pública da Google Books (não é a do usuário)
     created_at TEXT DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -81,23 +86,60 @@ def _get_or_create_author(conn, name: str) -> int:
     return cur.lastrowid
 
 
+DEFAULT_BOOK_FIELDS = {
+    "source_id": None,
+    "title": None,
+    "isbn": None,
+    "first_publish_year": None,
+    "cover_url": None,
+    "source_api": None,
+    "description": None,
+    "publisher": None,
+    "page_count": None,
+    "categories": None,
+    "average_rating": None,
+    "authors": [],
+}
+
+
 def upsert_book(conn, book: dict) -> int:
     """
-    Insere o livro se ele ainda não existe (baseado no olid),
+    Insere o livro se ele ainda não existe (baseado no source_id),
     ou atualiza os dados caso já exista. Retorna o id do livro no banco.
     Também garante os vínculos com os autores.
+
+    Campos ausentes em `book` recebem um default seguro (None / lista
+    vazia), então chamadores antigos que não conheçam os campos mais
+    recentes (ex: description, publisher) continuam funcionando.
     """
+    data = {**DEFAULT_BOOK_FIELDS, **book}
+
+    # categories pode vir como lista (da API) -> guardamos como string simples
+    if isinstance(data.get("categories"), list):
+        data["categories"] = ", ".join(data["categories"]) or None
+
     cur = conn.execute(
         """
-        INSERT INTO books (source_id, title, isbn, first_publish_year, cover_url, source_api)
-        VALUES (:source_id, :title, :isbn, :first_publish_year, :cover_url, :source_api)
+        INSERT INTO books (
+            source_id, title, isbn, first_publish_year, cover_url, source_api,
+            description, publisher, page_count, categories, average_rating
+        )
+        VALUES (
+            :source_id, :title, :isbn, :first_publish_year, :cover_url, :source_api,
+            :description, :publisher, :page_count, :categories, :average_rating
+        )
         ON CONFLICT(source_id) DO UPDATE SET
             title = excluded.title,
             isbn = excluded.isbn,
             first_publish_year = excluded.first_publish_year,
-            cover_url = excluded.cover_url
+            cover_url = excluded.cover_url,
+            description = excluded.description,
+            publisher = excluded.publisher,
+            page_count = excluded.page_count,
+            categories = excluded.categories,
+            average_rating = excluded.average_rating
         """,
-        book,
+        data,
     )
 
     if cur.lastrowid and cur.rowcount == 1 and cur.lastrowid != 0:
@@ -105,12 +147,12 @@ def upsert_book(conn, book: dict) -> int:
     else:
         # Em caso de UPDATE, lastrowid não é confiável -> buscamos pelo source_id
         row = conn.execute(
-            "SELECT id FROM books WHERE source_id = ?", (book["source_id"],)
+            "SELECT id FROM books WHERE source_id = ?", (data["source_id"],)
         ).fetchone()
         book_id = row["id"]
 
     # Vincula autores (evita duplicar vínculo com INSERT OR IGNORE)
-    for author_name in book.get("authors", []):
+    for author_name in data.get("authors") or []:
         author_id = _get_or_create_author(conn, author_name)
         conn.execute(
             "INSERT OR IGNORE INTO book_authors (book_id, author_id) VALUES (?, ?)",
@@ -131,6 +173,62 @@ def save_book(book: dict, db_path: str = DB_PATH) -> int:
     """Salva um único livro e retorna o id dele no banco (útil para APIs)."""
     with get_connection(db_path) as conn:
         return upsert_book(conn, book)
+
+
+def get_book_detail(book_id: int, db_path: str = DB_PATH) -> dict | None:
+    """
+    Retorna todos os dados de um livro (para a página de detalhes),
+    juntando autores e, se o livro estiver na lista de leitura, o
+    status/nota do usuário. Retorna None se o id não existir.
+    """
+    with get_connection(db_path) as conn:
+        row = conn.execute(
+            """
+            SELECT
+                b.*,
+                GROUP_CONCAT(DISTINCT a.name) AS authors,
+                ul.status,
+                ul.rating
+            FROM books b
+            LEFT JOIN book_authors ba ON ba.book_id = b.id
+            LEFT JOIN authors a ON a.id = ba.author_id
+            LEFT JOIN user_lists ul ON ul.book_id = b.id
+            WHERE b.id = ?
+            GROUP BY b.id
+            """,
+            (book_id,),
+        ).fetchone()
+
+        return dict(row) if row else None
+
+
+def get_book_detail_by_source_id(source_id: str, db_path: str = DB_PATH) -> dict | None:
+    """
+    Mesma ideia de get_book_detail, mas busca pelo source_id (id da API
+    de origem) em vez do id interno. É o que permite a página de detalhes
+    funcionar com um único identificador estável na URL, usado tanto para
+    livros já salvos quanto para resultados de busca ainda não salvos
+    (nesse caso, retorna None e quem chamou busca na API externa).
+    """
+    with get_connection(db_path) as conn:
+        row = conn.execute(
+            """
+            SELECT
+                b.*,
+                GROUP_CONCAT(DISTINCT a.name) AS authors,
+                ul.status,
+                ul.rating
+            FROM books b
+            LEFT JOIN book_authors ba ON ba.book_id = b.id
+            LEFT JOIN authors a ON a.id = ba.author_id
+            LEFT JOIN user_lists ul ON ul.book_id = b.id
+            WHERE b.source_id = ?
+            GROUP BY b.id
+            """,
+            (source_id,),
+        ).fetchone()
+
+        return dict(row) if row else None
 
 
 if __name__ == "__main__":
