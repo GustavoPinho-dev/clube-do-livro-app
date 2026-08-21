@@ -46,6 +46,14 @@
 
   </div>
 
+  <div class="book-modal" id="book-modal" role="dialog" aria-modal="true" aria-labelledby="book-modal-title" hidden>
+    <div class="book-modal-backdrop" data-close-modal></div>
+    <article class="book-modal-card" tabindex="-1">
+      <button class="book-modal-close" type="button" aria-label="Fechar detalhes" data-close-modal>×</button>
+      <div id="book-modal-content"></div>
+    </article>
+  </div>
+
   <!-- config.js define API_BASE_URL: é o único "acoplamento" entre os dois
        serviços, e é só uma URL configurável, não código compartilhado. -->
   <script src="config.js"></script>
