@@ -269,8 +269,10 @@ function renderListItem(livro) {
   item.innerHTML = `
     <span class="stamp stamp-${livro.status}">${STATUS_LABELS[livro.status]}</span>
     <div class="list-item-body">
-      <p class="list-item-title">${escapeHtml(livro.title)}</p>
-      <p class="list-item-meta">${escapeHtml(autores)}${ano}</p>
+      <button class="list-item-detail-btn" type="button" aria-label="Ver detalhes de ${escapeHtml(livro.title)}">
+        <p class="list-item-title">${escapeHtml(livro.title)}</p>
+        <p class="list-item-meta">${escapeHtml(autores)}${ano}</p>
+      </button>
     </div>
     <button class="btn btn-small btn-ghost details-btn" type="button" aria-label="Ver detalhes de ${escapeHtml(livro.title)}">Ver detalhes</button>
     <div class="rating" role="group" aria-label="Avaliação">${starsHtml}</div>
