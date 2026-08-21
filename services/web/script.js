@@ -11,6 +11,9 @@ const resultsEl = document.getElementById("results");
 const listPanel = document.getElementById("list-panel");
 const drawerTabs = document.getElementById("drawer-tabs");
 const connectionBanner = document.getElementById("connection-banner");
+const bookModal = document.getElementById("book-modal");
+const bookModalCard = bookModal.querySelector(".book-modal-card");
+const bookModalContent = document.getElementById("book-modal-content");
 
 const STATUS_LABELS = {
   quero_ler: "Quero ler",
@@ -19,6 +22,7 @@ const STATUS_LABELS = {
 };
 
 let currentStatusFilter = "";
+let lastFocusedElement = null;
 
 // ---------------- utilidades ----------------
 
@@ -55,6 +59,85 @@ async function checkApiConnection() {
   } catch (err) {
     connectionBanner.innerHTML = `<div class="error-banner">Não foi possível conectar à API em ${API_BASE_URL}. Verifique se o serviço está rodando.</div>`;
   }
+}
+
+
+function formatValue(value, fallback = "Não informado") {
+  return value ? escapeHtml(value) : fallback;
+}
+
+function formatDate(dateValue) {
+  if (!dateValue) return "Não informado";
+  const date = new Date(dateValue);
+  if (Number.isNaN(date.getTime())) return escapeHtml(dateValue);
+  return new Intl.DateTimeFormat("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date);
+}
+
+function renderStars(rating) {
+  const value = rating || 0;
+  return [1, 2, 3, 4, 5].map((n) => (n <= value ? "★" : "☆")).join("");
+}
+
+function openBookModal(livro) {
+  lastFocusedElement = document.activeElement;
+
+  const coverHtml = livro.cover_url
+    ? `<img class="book-detail-cover" src="${escapeHtml(livro.cover_url)}" alt="Capa de ${escapeHtml(livro.title)}">`
+    : `<div class="book-detail-cover-placeholder" aria-hidden="true">?</div>`;
+
+  bookModalContent.innerHTML = `
+    <div class="book-detail">
+      <div>${coverHtml}</div>
+      <div>
+        <p class="book-detail-kicker">Ficha catalográfica</p>
+        <h2 class="book-detail-title" id="book-modal-title">${escapeHtml(livro.title)}</h2>
+        <span class="stamp stamp-${livro.status}">${STATUS_LABELS[livro.status]}</span>
+        <div class="book-detail-meta">
+          <div class="book-detail-field">
+            <span class="book-detail-label">Autor(es)</span>
+            <p class="book-detail-value">${formatValue(livro.authors)}</p>
+          </div>
+          <div class="book-detail-field">
+            <span class="book-detail-label">Ano de publicação</span>
+            <p class="book-detail-value">${formatValue(livro.first_publish_year)}</p>
+          </div>
+          <div class="book-detail-field">
+            <span class="book-detail-label">ISBN</span>
+            <p class="book-detail-value">${formatValue(livro.isbn)}</p>
+          </div>
+          <div class="book-detail-field">
+            <span class="book-detail-label">Avaliação</span>
+            <p class="book-detail-value" aria-label="${livro.rating || 0} de 5 estrelas">${renderStars(livro.rating)}</p>
+          </div>
+          <div class="book-detail-field">
+            <span class="book-detail-label">Adicionado em</span>
+            <p class="book-detail-value">${formatDate(livro.added_at)}</p>
+          </div>
+          <div class="book-detail-field">
+            <span class="book-detail-label">Última atualização</span>
+            <p class="book-detail-value">${formatDate(livro.updated_at)}</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+
+  bookModal.hidden = false;
+  document.body.style.overflow = "hidden";
+  bookModalCard.focus();
+}
+
+function closeBookModal() {
+  bookModal.hidden = true;
+  bookModalContent.innerHTML = "";
+  document.body.style.overflow = "";
+  lastFocusedElement?.focus();
 }
 
 // ---------------- busca ----------------
@@ -163,7 +246,7 @@ function renderList(livros) {
 
 function renderListItem(livro) {
   const item = document.createElement("div");
-  item.className = "list-item";
+  item.className = "list-item list-item-clickable";
 
   const autores = livro.authors || "";
   const ano = livro.first_publish_year ? ` · ${livro.first_publish_year}` : "";
@@ -186,13 +269,21 @@ function renderListItem(livro) {
   item.innerHTML = `
     <span class="stamp stamp-${livro.status}">${STATUS_LABELS[livro.status]}</span>
     <div class="list-item-body">
-      <p class="list-item-title">${escapeHtml(livro.title)}</p>
-      <p class="list-item-meta">${escapeHtml(autores)}${ano}</p>
+      <button class="list-item-detail-btn" type="button" aria-label="Ver detalhes de ${escapeHtml(livro.title)}">
+        <p class="list-item-title">${escapeHtml(livro.title)}</p>
+        <p class="list-item-meta">${escapeHtml(autores)}${ano}</p>
+      </button>
     </div>
     <div class="rating" role="group" aria-label="Avaliação">${starsHtml}</div>
     <select class="status-select" aria-label="Mudar status">${statusOptions}</select>
     <button class="remove-btn" type="button" aria-label="Remover da lista">×</button>
   `;
+
+  item.addEventListener("click", (e) => {
+    if (e.target.closest("button, select")) return;
+    openBookModal(livro);
+  });
+  item.querySelector(".list-item-detail-btn").addEventListener("click", () => openBookModal(livro));
 
   // Avaliação por estrelas
   item.querySelectorAll(".rating button").forEach((btn) => {
@@ -235,6 +326,14 @@ function renderListItem(livro) {
 
   return item;
 }
+
+bookModal.addEventListener("click", (e) => {
+  if (e.target.matches("[data-close-modal]")) closeBookModal();
+});
+
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && !bookModal.hidden) closeBookModal();
+});
 
 // ---------------- gavetas (filtro por status) ----------------
 
