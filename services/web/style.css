@@ -595,19 +595,8 @@ html, body {
   text-decoration: underline;
 }
 
-.list-item-detail-btn {
-  width: 100%;
-  padding: 0;
-  border: 0;
-  background: none;
-  color: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-
-.list-item-detail-btn:focus-visible {
-  outline: 3px solid var(--brass);
-  outline-offset: 3px;
+.details-btn {
+  white-space: nowrap;
 }
 
 @media (max-width: 560px) {

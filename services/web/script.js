@@ -274,6 +274,7 @@ function renderListItem(livro) {
         <p class="list-item-meta">${escapeHtml(autores)}${ano}</p>
       </button>
     </div>
+    <button class="btn btn-small btn-ghost details-btn" type="button" aria-label="Ver detalhes de ${escapeHtml(livro.title)}">Ver detalhes</button>
     <div class="rating" role="group" aria-label="Avaliação">${starsHtml}</div>
     <select class="status-select" aria-label="Mudar status">${statusOptions}</select>
     <button class="remove-btn" type="button" aria-label="Remover da lista">×</button>
@@ -283,7 +284,7 @@ function renderListItem(livro) {
     if (e.target.closest("button, select")) return;
     openBookModal(livro);
   });
-  item.querySelector(".list-item-detail-btn").addEventListener("click", () => openBookModal(livro));
+  item.querySelector(".details-btn").addEventListener("click", () => openBookModal(livro));
 
   // Avaliação por estrelas
   item.querySelectorAll(".rating button").forEach((btn) => {
