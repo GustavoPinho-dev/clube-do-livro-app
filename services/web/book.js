@@ -83,10 +83,12 @@ function renderDetail(livro) {
         </div>
       </div>
       ${descricaoHtml}
+      <div id="detail-extra"></div>
     </article>
   `;
 
   renderActions(livro);
+  renderPersonalSections(livro);
 }
 
 function renderActions(livro) {
@@ -171,6 +173,171 @@ function renderActions(livro) {
     } catch (err) {
       showFeedback(detailFeedback, err.message);
     }
+  });
+}
+
+function renderPersonalSections(livro) {
+  const extraEl = document.getElementById("detail-extra");
+
+  // Essas seções só fazem sentido se o livro já está na lista (tem status).
+  // Sem isso não há uma linha em user_lists para guardar datas/resenha, e
+  // citações ficam soltas sem contexto de "estou lendo/li este livro".
+  if (!livro.status) {
+    extraEl.innerHTML = `
+      <p class="empty-note detail-section">Adicione este livro à sua lista para registrar datas de leitura, resenha e citações.</p>
+    `;
+    return;
+  }
+
+  extraEl.innerHTML = `
+    <div class="detail-section">
+      <p class="detail-section-title">Datas de leitura</p>
+      <div class="dates-row">
+        <div class="field-group">
+          <label for="started-at">Início</label>
+          <input type="date" id="started-at" value="${livro.started_at || ""}">
+        </div>
+        <div class="field-group">
+          <label for="finished-at">Término</label>
+          <input type="date" id="finished-at" value="${livro.finished_at || ""}">
+        </div>
+        <button class="btn btn-small" type="button" id="save-dates-btn">Salvar datas</button>
+      </div>
+    </div>
+
+    <div class="detail-section">
+      <p class="detail-section-title">Resenha</p>
+      <textarea class="review-textarea" id="review-input" placeholder="O que você achou do livro?">${escapeHtml(livro.review || "")}</textarea>
+      <div class="review-actions">
+        <button class="btn btn-small" type="button" id="save-review-btn">Salvar resenha</button>
+      </div>
+    </div>
+
+    <div class="detail-section">
+      <p class="detail-section-title">Principais citações</p>
+      <div class="quote-list" id="quote-list"></div>
+      <div class="quote-form-row">
+        <textarea class="quote-textarea" id="quote-input" placeholder="Digite uma citação marcante…"></textarea>
+        <div class="field-group">
+          <label for="quote-page">Página</label>
+          <input type="number" id="quote-page" min="1">
+        </div>
+      </div>
+      <div class="quote-form-actions">
+        <button class="btn btn-small" type="button" id="add-quote-btn">Adicionar citação</button>
+      </div>
+    </div>
+  `;
+
+  renderQuoteList(livro.quotes || [], livro.book_id);
+
+  // --- datas ---
+  document.getElementById("save-dates-btn").addEventListener("click", async (e) => {
+    const btn = e.target;
+    const startedAt = document.getElementById("started-at").value;
+    const finishedAt = document.getElementById("finished-at").value;
+
+    btn.disabled = true;
+    try {
+      await apiFetch(`/api/list/${livro.book_id}/dates`, {
+        method: "POST",
+        body: JSON.stringify({ started_at: startedAt, finished_at: finishedAt }),
+      });
+      btn.textContent = "Salvo ✓";
+      setTimeout(() => {
+        btn.textContent = "Salvar datas";
+        btn.disabled = false;
+      }, 1500);
+    } catch (err) {
+      btn.disabled = false;
+      showFeedback(detailFeedback, err.message);
+    }
+  });
+
+  // --- resenha ---
+  document.getElementById("save-review-btn").addEventListener("click", async (e) => {
+    const btn = e.target;
+    const review = document.getElementById("review-input").value;
+
+    btn.disabled = true;
+    try {
+      await apiFetch(`/api/list/${livro.book_id}/review`, {
+        method: "POST",
+        body: JSON.stringify({ review }),
+      });
+      btn.textContent = "Salvo ✓";
+      setTimeout(() => {
+        btn.textContent = "Salvar resenha";
+        btn.disabled = false;
+      }, 1500);
+    } catch (err) {
+      btn.disabled = false;
+      showFeedback(detailFeedback, err.message);
+    }
+  });
+
+  // --- adicionar citação ---
+  document.getElementById("add-quote-btn").addEventListener("click", async (e) => {
+    const btn = e.target;
+    const quoteInput = document.getElementById("quote-input");
+    const pageInput = document.getElementById("quote-page");
+
+    const quote = quoteInput.value.trim();
+    if (!quote) {
+      showFeedback(detailFeedback, "Digite o texto da citação antes de adicionar.");
+      return;
+    }
+
+    const page = pageInput.value ? Number(pageInput.value) : null;
+
+    btn.disabled = true;
+    btn.textContent = "Adicionando…";
+    try {
+      await apiFetch(`/api/books/${livro.book_id}/quotes`, {
+        method: "POST",
+        body: JSON.stringify({ quote, page }),
+      });
+      quoteInput.value = "";
+      pageInput.value = "";
+      await loadDetail(); // recarrega para trazer a citação já com id
+    } catch (err) {
+      showFeedback(detailFeedback, err.message);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "Adicionar citação";
+    }
+  });
+}
+
+function renderQuoteList(quotes, bookId) {
+  const listEl = document.getElementById("quote-list");
+
+  if (quotes.length === 0) {
+    listEl.innerHTML = `<p class="empty-note">Nenhuma citação registrada ainda.</p>`;
+    return;
+  }
+
+  listEl.innerHTML = quotes
+    .map(
+      (q) => `
+        <div class="quote-card" data-quote-id="${q.id}">
+          “${escapeHtml(q.quote)}”
+          ${q.page ? `<span class="quote-card-page">p. ${escapeHtml(String(q.page))}</span>` : ""}
+          <button class="quote-remove-btn" type="button" data-quote-id="${q.id}" aria-label="Remover citação">×</button>
+        </div>
+      `
+    )
+    .join("");
+
+  listEl.querySelectorAll(".quote-remove-btn").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      try {
+        await apiFetch(`/api/quotes/${btn.dataset.quoteId}`, { method: "DELETE" });
+        await loadDetail();
+      } catch (err) {
+        showFeedback(detailFeedback, err.message);
+      }
+    });
   });
 }
 

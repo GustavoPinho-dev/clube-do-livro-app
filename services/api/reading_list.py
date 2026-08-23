@@ -9,6 +9,8 @@ Regra do protótipo: cada livro tem, no máximo, UMA entrada na lista
 é sempre um upsert -- se o livro já estiver lá, apenas atualiza o status.
 """
 
+from datetime import date
+
 from db import get_connection, DB_PATH
 
 STATUSES = ("quero_ler", "lendo", "lido")
@@ -22,6 +24,17 @@ def _validate_status(status: str):
 def _validate_rating(rating):
     if rating is not None and not (1 <= rating <= 5):
         raise ValueError("rating deve ser um inteiro entre 1 e 5")
+
+
+def _validate_date(value: str | None) -> str | None:
+    """Aceita None (limpa a data) ou uma string 'YYYY-MM-DD' válida."""
+    if value is None or value == "":
+        return None
+    try:
+        date.fromisoformat(value)
+    except ValueError:
+        raise ValueError(f"data inválida: '{value}'. Use o formato AAAA-MM-DD.")
+    return value
 
 
 # ---------------------------------------------------------------------
@@ -102,6 +115,84 @@ def mark_as_read(conn, book_id: int, rating: int = None):
         set_rating(conn, book_id, rating)
 
 
+def set_reading_dates(conn, book_id: int, started_at: str = None, finished_at: str = None):
+    """
+    Define a data de início e/ou término da leitura (formato 'YYYY-MM-DD').
+    Passar None para um campo o mantém como está -- use string vazia (\"\")
+    explicitamente para limpar uma data já definida.
+
+    Faz uma validação leve: se as duas datas ficarem definidas (a que está
+    sendo passada agora + a que já existia no banco), a data de término não
+    pode ser anterior à de início.
+    """
+    row = conn.execute(
+        "SELECT started_at, finished_at FROM user_lists WHERE book_id = ?", (book_id,)
+    ).fetchone()
+    if row is None:
+        raise ValueError(
+            f"Livro (id={book_id}) não está na lista. Use add_to_list primeiro."
+        )
+
+    novo_started = _validate_date(started_at) if started_at is not None else row["started_at"]
+    novo_finished = _validate_date(finished_at) if finished_at is not None else row["finished_at"]
+
+    if novo_started and novo_finished and novo_finished < novo_started:
+        raise ValueError("a data de término não pode ser anterior à data de início.")
+
+    conn.execute(
+        """
+        UPDATE user_lists
+        SET started_at = ?, finished_at = ?, updated_at = CURRENT_TIMESTAMP
+        WHERE book_id = ?
+        """,
+        (novo_started, novo_finished, book_id),
+    )
+
+
+def set_review(conn, book_id: int, review: str):
+    """Define (ou limpa, com string vazia/None) a resenha pessoal do livro."""
+    cur = conn.execute(
+        """
+        UPDATE user_lists
+        SET review = ?, updated_at = CURRENT_TIMESTAMP
+        WHERE book_id = ?
+        """,
+        (review or None, book_id),
+    )
+
+    if cur.rowcount == 0:
+        raise ValueError(
+            f"Livro (id={book_id}) não está na lista. Use add_to_list primeiro."
+        )
+
+
+def add_quote(conn, book_id: int, quote: str, page: int = None) -> int:
+    """Adiciona uma citação a um livro. Retorna o id da citação criada."""
+    quote = (quote or "").strip()
+    if not quote:
+        raise ValueError("a citação não pode ficar vazia.")
+
+    cur = conn.execute(
+        "INSERT INTO book_quotes (book_id, quote, page) VALUES (?, ?, ?)",
+        (book_id, quote, page),
+    )
+    return cur.lastrowid
+
+
+def remove_quote(conn, quote_id: int):
+    """Remove uma citação pelo id dela."""
+    conn.execute("DELETE FROM book_quotes WHERE id = ?", (quote_id,))
+
+
+def get_quotes(conn, book_id: int) -> list[dict]:
+    """Lista as citações salvas para um livro, da mais recente pra mais antiga."""
+    rows = conn.execute(
+        "SELECT id, quote, page, created_at FROM book_quotes WHERE book_id = ? ORDER BY created_at DESC",
+        (book_id,),
+    ).fetchall()
+    return [dict(row) for row in rows]
+
+
 def remove_from_list(conn, book_id: int):
     """Remove um livro da lista (não apaga o livro da tabela books)."""
     conn.execute("DELETE FROM user_lists WHERE book_id = ?", (book_id,))
@@ -174,6 +265,31 @@ def list_books(status: str = None, db_path: str = DB_PATH) -> list[dict]:
 def remove_book_from_list(book_id: int, db_path: str = DB_PATH):
     with get_connection(db_path) as conn:
         remove_from_list(conn, book_id)
+
+
+def update_reading_dates(book_id: int, started_at: str = None, finished_at: str = None, db_path: str = DB_PATH):
+    with get_connection(db_path) as conn:
+        set_reading_dates(conn, book_id, started_at=started_at, finished_at=finished_at)
+
+
+def update_review(book_id: int, review: str, db_path: str = DB_PATH):
+    with get_connection(db_path) as conn:
+        set_review(conn, book_id, review)
+
+
+def add_quote_to_book(book_id: int, quote: str, page: int = None, db_path: str = DB_PATH) -> int:
+    with get_connection(db_path) as conn:
+        return add_quote(conn, book_id, quote, page)
+
+
+def remove_quote_from_book(quote_id: int, db_path: str = DB_PATH):
+    with get_connection(db_path) as conn:
+        remove_quote(conn, quote_id)
+
+
+def list_quotes(book_id: int, db_path: str = DB_PATH) -> list[dict]:
+    with get_connection(db_path) as conn:
+        return get_quotes(conn, book_id)
 
 
 if __name__ == "__main__":

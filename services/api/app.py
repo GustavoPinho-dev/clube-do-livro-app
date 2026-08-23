@@ -30,8 +30,14 @@ from reading_list import (
     rate_book,
     list_books,
     remove_book_from_list,
+    update_reading_dates,
+    update_review,
+    add_quote_to_book,
+    remove_quote_from_book,
+    list_quotes,
     STATUSES,
 )
+import sqlite3
 
 load_dotenv()
 
@@ -89,7 +95,9 @@ def api_get_book(book_id):
     if livro is None:
         return jsonify({"error": f"Livro id={book_id} não encontrado."}), 404
 
-    return jsonify(_normalize_book_response(livro))
+    livro = _normalize_book_response(livro)
+    livro["quotes"] = list_quotes(book_id)
+    return jsonify(livro)
 
 
 @app.route("/api/volumes/<path:source_id>")
@@ -104,7 +112,9 @@ def api_get_volume(source_id):
 
     livro = get_book_detail_by_source_id(source_id)
     if livro is not None:
-        return jsonify(_normalize_book_response(livro))
+        livro = _normalize_book_response(livro)
+        livro["quotes"] = list_quotes(livro["book_id"])
+        return jsonify(livro)
 
     # Não está salvo ainda -> busca direto na Google Books
     try:
@@ -117,8 +127,17 @@ def api_get_volume(source_id):
     if livro is None:
         return jsonify({"error": f"Volume '{source_id}' não encontrado."}), 404
 
-    livro.update({"book_id": None, "status": None, "rating": None})
-    return jsonify(_normalize_book_response(livro))
+    livro.update({
+        "book_id": None,
+        "status": None,
+        "rating": None,
+        "started_at": None,
+        "finished_at": None,
+        "review": None,
+    })
+    livro = _normalize_book_response(livro)
+    livro["quotes"] = []  # ainda não salvo -> não pode ter citações registradas
+    return jsonify(livro)
 
 
 def _normalize_book_response(livro: dict) -> dict:
@@ -189,6 +208,66 @@ def api_rate(book_id):
 @app.route("/api/list/<int:book_id>", methods=["DELETE"])
 def api_remove(book_id):
     remove_book_from_list(book_id)
+    return jsonify({"ok": True})
+
+
+@app.route("/api/list/<int:book_id>/dates", methods=["POST"])
+def api_set_dates(book_id):
+    """
+    Define as datas de início/término de leitura.
+    Corpo: {"started_at": "YYYY-MM-DD" | "", "finished_at": "YYYY-MM-DD" | ""}
+    Envie string vazia para limpar uma data já definida.
+    """
+    data = request.get_json(silent=True) or {}
+
+    try:
+        update_reading_dates(
+            book_id,
+            started_at=data.get("started_at"),
+            finished_at=data.get("finished_at"),
+        )
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+
+    return jsonify({"ok": True})
+
+
+@app.route("/api/list/<int:book_id>/review", methods=["POST"])
+def api_set_review(book_id):
+    """Define (ou limpa, com string vazia) a resenha pessoal. Corpo: {"review": "..."}"""
+    data = request.get_json(silent=True) or {}
+
+    try:
+        update_review(book_id, data.get("review", ""))
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+
+    return jsonify({"ok": True})
+
+
+@app.route("/api/books/<int:book_id>/quotes", methods=["POST"])
+def api_add_quote(book_id):
+    """Adiciona uma citação. Corpo: {"quote": "...", "page": 123 (opcional)}"""
+    data = request.get_json(silent=True) or {}
+    quote = data.get("quote", "")
+    page = data.get("page")
+
+    if page is not None and not isinstance(page, int):
+        return jsonify({"error": "page deve ser um número inteiro."}), 400
+
+    try:
+        quote_id = add_quote_to_book(book_id, quote, page)
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+    except sqlite3.IntegrityError:
+        return jsonify({"error": f"Livro id={book_id} não encontrado."}), 404
+
+    return jsonify({"quote_id": quote_id}), 201
+
+
+@app.route("/api/quotes/<int:quote_id>", methods=["DELETE"])
+def api_remove_quote(quote_id):
+    remove_quote_from_book(quote_id)
     return jsonify({"ok": True})
 
 

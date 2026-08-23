@@ -50,8 +50,19 @@ CREATE TABLE IF NOT EXISTS user_lists (
     book_id INTEGER NOT NULL UNIQUE REFERENCES books(id) ON DELETE CASCADE,
     status TEXT CHECK(status IN ('quero_ler', 'lendo', 'lido')) DEFAULT 'quero_ler',
     rating INTEGER CHECK(rating BETWEEN 1 AND 5),
+    started_at TEXT,                -- data de início da leitura (YYYY-MM-DD)
+    finished_at TEXT,                -- data de término da leitura (YYYY-MM-DD)
+    review TEXT,                     -- resenha pessoal do usuário
     added_at TEXT DEFAULT CURRENT_TIMESTAMP,
     updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS book_quotes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    book_id INTEGER NOT NULL REFERENCES books(id) ON DELETE CASCADE,
+    quote TEXT NOT NULL,
+    page INTEGER,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP
 );
 """
 
@@ -69,10 +80,30 @@ def get_connection(db_path: str = DB_PATH):
         conn.close()
 
 
+def _ensure_columns(conn, table: str, columns: dict[str, str]):
+    """
+    Migração leve: adiciona colunas que ainda não existem em `table`.
+    Necessário porque 'CREATE TABLE IF NOT EXISTS' não altera uma tabela
+    que já existe -- então um banco criado antes de um campo novo ser
+    adicionado ao schema (ex: started_at/finished_at/review) nunca
+    ganharia essas colunas sozinho, e a API quebraria com
+    "no such column" na primeira tentativa de usá-las.
+    """
+    existentes = {row["name"] for row in conn.execute(f"PRAGMA table_info({table})")}
+    for nome, tipo in columns.items():
+        if nome not in existentes:
+            conn.execute(f"ALTER TABLE {table} ADD COLUMN {nome} {tipo}")
+
+
 def init_db(db_path: str = DB_PATH):
-    """Cria as tabelas caso não existam."""
+    """Cria as tabelas caso não existam e migra colunas novas em bancos antigos."""
     with get_connection(db_path) as conn:
         conn.executescript(SCHEMA)
+        _ensure_columns(conn, "user_lists", {
+            "started_at": "TEXT",
+            "finished_at": "TEXT",
+            "review": "TEXT",
+        })
 
 
 def _get_or_create_author(conn, name: str) -> int:
@@ -188,7 +219,10 @@ def get_book_detail(book_id: int, db_path: str = DB_PATH) -> dict | None:
                 b.*,
                 GROUP_CONCAT(DISTINCT a.name) AS authors,
                 ul.status,
-                ul.rating
+                ul.rating,
+                ul.started_at,
+                ul.finished_at,
+                ul.review
             FROM books b
             LEFT JOIN book_authors ba ON ba.book_id = b.id
             LEFT JOIN authors a ON a.id = ba.author_id
@@ -217,7 +251,10 @@ def get_book_detail_by_source_id(source_id: str, db_path: str = DB_PATH) -> dict
                 b.*,
                 GROUP_CONCAT(DISTINCT a.name) AS authors,
                 ul.status,
-                ul.rating
+                ul.rating,
+                ul.started_at,
+                ul.finished_at,
+                ul.review
             FROM books b
             LEFT JOIN book_authors ba ON ba.book_id = b.id
             LEFT JOIN authors a ON a.id = ba.author_id
