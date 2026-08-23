@@ -206,6 +206,40 @@ def save_book(book: dict, db_path: str = DB_PATH) -> int:
         return upsert_book(conn, book)
 
 
+def get_books_by_ids(book_ids: list[int], db_path: str = DB_PATH) -> list[dict]:
+    """
+    Busca dados básicos (título, autores, capa, ano) de vários livros de
+    uma vez, na ordem em que os ids foram passados. Usado para montar o
+    conteúdo de uma lista personalizada sem fazer uma query por livro.
+    ids que não existirem mais em `books` são simplesmente ignorados.
+    """
+    if not book_ids:
+        return []
+
+    with get_connection(db_path) as conn:
+        placeholders = ",".join("?" * len(book_ids))
+        rows = conn.execute(
+            f"""
+            SELECT
+                b.id AS book_id,
+                b.title,
+                b.first_publish_year,
+                b.cover_url,
+                GROUP_CONCAT(DISTINCT a.name) AS authors
+            FROM books b
+            LEFT JOIN book_authors ba ON ba.book_id = b.id
+            LEFT JOIN authors a ON a.id = ba.author_id
+            WHERE b.id IN ({placeholders})
+            GROUP BY b.id
+            """,
+            book_ids,
+        ).fetchall()
+
+    por_id = {row["book_id"]: dict(row) for row in rows}
+    # preserva a ordem recebida (ex: mais recentemente adicionado primeiro)
+    return [por_id[bid] for bid in book_ids if bid in por_id]
+
+
 def get_book_detail(book_id: int, db_path: str = DB_PATH) -> dict | None:
     """
     Retorna todos os dados de um livro (para a página de detalhes),

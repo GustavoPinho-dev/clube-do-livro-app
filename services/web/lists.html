@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Minhas listas — Catálogo de Leituras</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,600;1,600&family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;500&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="wrap">
+
+    <a class="back-link" href="index.html">&larr; Voltar ao catálogo</a>
+
+    <div id="connection-banner"></div>
+
+    <header class="page-header">
+      <h1 class="page-title">Minhas listas</h1>
+    </header>
+
+    <form class="create-list-form" id="create-list-form">
+      <label for="list-name-input" class="search-slip-label">Nova lista</label>
+      <input type="text" id="list-name-input" placeholder="Nome da lista (ex: Favoritos de filosofia)" autocomplete="off" required>
+      <input type="text" id="list-desc-input" placeholder="Descrição (opcional)" autocomplete="off">
+      <button class="btn" type="submit">Criar lista</button>
+    </form>
+
+    <div id="lists-feedback"></div>
+
+    <section class="lists-grid" id="lists-grid" aria-live="polite"></section>
+
+  </div>
+
+  <script src="config.js"></script>
+  <script src="common.js"></script>
+  <script src="lists.js"></script>
+</body>
+</html>

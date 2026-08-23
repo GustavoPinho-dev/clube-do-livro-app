@@ -179,17 +179,12 @@ function renderActions(livro) {
 function renderPersonalSections(livro) {
   const extraEl = document.getElementById("detail-extra");
 
-  // Essas seções só fazem sentido se o livro já está na lista (tem status).
-  // Sem isso não há uma linha em user_lists para guardar datas/resenha, e
-  // citações ficam soltas sem contexto de "estou lendo/li este livro".
-  if (!livro.status) {
-    extraEl.innerHTML = `
-      <p class="empty-note detail-section">Adicione este livro à sua lista para registrar datas de leitura, resenha e citações.</p>
-    `;
-    return;
-  }
-
-  extraEl.innerHTML = `
+  // Listas personalizadas não dependem de status de leitura -- só do livro
+  // já estar salvo (o que sempre é verdade nesta página). Datas/resenha/
+  // citações, por outro lado, vivem em user_lists e só existem se o livro
+  // estiver em alguma gaveta (quero_ler/lendo/lido).
+  const readingSectionsHtml = livro.status
+    ? `
     <div class="detail-section">
       <p class="detail-section-title">Datas de leitura</p>
       <div class="dates-row">
@@ -227,7 +222,23 @@ function renderPersonalSections(livro) {
         <button class="btn btn-small" type="button" id="add-quote-btn">Adicionar citação</button>
       </div>
     </div>
+  `
+    : `<p class="empty-note detail-section">Adicione este livro à sua lista para registrar datas de leitura, resenha e citações.</p>`;
+
+  extraEl.innerHTML = `
+    <div class="detail-section" id="custom-lists-section">
+      <p class="detail-section-title">Listas personalizadas</p>
+      <div id="custom-lists-checkboxes"><p class="loading">Carregando…</p></div>
+      <a class="section-link" href="lists.html">+ criar nova lista</a>
+    </div>
+    ${readingSectionsHtml}
   `;
+
+  renderCustomListsCheckboxes(livro);
+
+  if (!livro.status) {
+    return;
+  }
 
   renderQuoteList(livro.quotes || [], livro.book_id);
 
@@ -306,6 +317,61 @@ function renderPersonalSections(livro) {
       btn.disabled = false;
       btn.textContent = "Adicionar citação";
     }
+  });
+}
+
+async function renderCustomListsCheckboxes(livro) {
+  const containerEl = document.getElementById("custom-lists-checkboxes");
+
+  let todasAsListas;
+  try {
+    todasAsListas = await apiFetch("/api/custom-lists");
+  } catch (err) {
+    containerEl.innerHTML = `<p class="loading">Não foi possível carregar as listas.</p>`;
+    return;
+  }
+
+  if (todasAsListas.length === 0) {
+    containerEl.innerHTML = `<p class="empty-note">Você ainda não criou nenhuma lista.</p>`;
+    return;
+  }
+
+  const idsAtuais = new Set((livro.custom_lists || []).map((l) => l.id));
+
+  containerEl.innerHTML = todasAsListas
+    .map(
+      (lista) => `
+        <div class="list-checkbox-row">
+          <input type="checkbox" id="clist-${lista.id}" data-list-id="${lista.id}" ${idsAtuais.has(lista.id) ? "checked" : ""}>
+          <label for="clist-${lista.id}">${escapeHtml(lista.name)}</label>
+        </div>
+      `
+    )
+    .join("");
+
+  containerEl.querySelectorAll('input[type="checkbox"]').forEach((checkbox) => {
+    checkbox.addEventListener("change", async () => {
+      const listId = checkbox.dataset.listId;
+      checkbox.disabled = true;
+
+      try {
+        if (checkbox.checked) {
+          await apiFetch(`/api/custom-lists/${listId}/books`, {
+            method: "POST",
+            body: JSON.stringify({ book_id: livro.book_id }),
+          });
+        } else {
+          await apiFetch(`/api/custom-lists/${listId}/books/${livro.book_id}`, {
+            method: "DELETE",
+          });
+        }
+      } catch (err) {
+        checkbox.checked = !checkbox.checked; // desfaz visualmente se der erro
+        showFeedback(detailFeedback, err.message);
+      } finally {
+        checkbox.disabled = false;
+      }
+    });
   });
 }
 

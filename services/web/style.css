@@ -758,6 +758,252 @@ html, body {
   margin: 0 0 14px;
 }
 
+/* ---------- Listas personalizadas ---------- */
+/* Metáfora: abas de divisor escritas à mão num fichário -- diferente das
+   "gavetas" fixas (quero_ler/lendo/lido), essas o usuário cria e nomeia. */
+
+.page-header {
+  border-bottom: 3px double var(--ink);
+  padding-bottom: 18px;
+  margin-bottom: 28px;
+}
+
+.page-title {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-style: italic;
+  font-size: clamp(1.75rem, 4.5vw, 2.5rem);
+  margin: 0;
+  color: var(--ink);
+}
+
+.create-list-form {
+  background: var(--card);
+  border: 1px solid var(--line-strong);
+  box-shadow: var(--shadow);
+  padding: 18px 20px;
+  margin-bottom: 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.create-list-form input[type="text"],
+.create-list-form textarea {
+  font-family: var(--font-body);
+  font-size: 15px;
+  padding: 10px 12px;
+  border: 1px solid var(--line-strong);
+  background: #fff;
+  color: var(--ink);
+  width: 100%;
+}
+
+.create-list-form input[type="text"]:focus,
+.create-list-form textarea:focus {
+  outline: 3px solid var(--brass);
+  outline-offset: 1px;
+}
+
+.lists-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.list-card {
+  position: relative;
+  background: var(--card);
+  border: 1px solid var(--line-strong);
+  border-left: 4px solid var(--brass);
+  box-shadow: var(--shadow);
+  padding: 16px 18px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.list-card-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.list-card-name {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 18px;
+  margin: 0 0 2px;
+}
+
+.list-card-desc {
+  font-size: 13px;
+  color: var(--ink-soft);
+  margin: 0 0 4px;
+}
+
+.list-card-count {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--brass);
+  margin: 0;
+}
+
+.list-card-actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+/* Página de detalhe de uma lista personalizada */
+
+.list-detail-header {
+  background: var(--card);
+  border: 1px solid var(--line-strong);
+  box-shadow: var(--shadow);
+  padding: 20px 22px;
+  margin-bottom: 24px;
+}
+
+.list-detail-name {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-style: italic;
+  font-size: clamp(1.5rem, 4vw, 2rem);
+  margin: 0 0 4px;
+}
+
+.list-detail-desc {
+  font-size: 14px;
+  color: var(--ink-soft);
+  margin: 0 0 14px;
+}
+
+.list-detail-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.edit-list-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px dashed var(--line-strong);
+}
+
+.edit-list-form input[type="text"],
+.edit-list-form textarea {
+  font-family: var(--font-body);
+  font-size: 14px;
+  padding: 8px 10px;
+  border: 1px solid var(--line-strong);
+  background: #fff;
+  color: var(--ink);
+  width: 100%;
+}
+
+.book-mini-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 0;
+  border-bottom: 1px dashed var(--line-strong);
+}
+
+.book-mini-card:last-child {
+  border-bottom: none;
+}
+
+.book-mini-cover {
+  width: 40px;
+  height: 58px;
+  object-fit: cover;
+  background: var(--brass-light);
+  border: 1px solid var(--line-strong);
+  flex-shrink: 0;
+}
+
+.book-mini-cover-placeholder {
+  width: 40px;
+  height: 58px;
+  flex-shrink: 0;
+  background: var(--brass-light);
+  border: 1px solid var(--line-strong);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display);
+  font-style: italic;
+  color: var(--brass);
+  font-size: 18px;
+}
+
+.book-mini-body {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Seção "listas personalizadas" dentro da página de detalhe do livro */
+
+.list-checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+  font-size: 14px;
+}
+
+.list-checkbox-row input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--forest);
+  cursor: pointer;
+}
+
+.list-checkbox-row label {
+  cursor: pointer;
+}
+
+.section-link {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--forest);
+  text-decoration: none;
+  margin-top: 8px;
+}
+
+.section-link:hover,
+.section-link:focus-visible {
+  text-decoration: underline;
+}
+
+.top-nav {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: -12px;
+}
+
+.top-nav a {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--forest);
+  text-decoration: none;
+}
+
+.top-nav a:hover,
+.top-nav a:focus-visible {
+  text-decoration: underline;
+}
+
 /* ---------- Responsivo ---------- */
 
 @media (max-width: 560px) {
@@ -767,6 +1013,15 @@ html, body {
 
   .card, .list-item {
     flex-wrap: wrap;
+  }
+
+  .list-card, .book-mini-card {
+    flex-wrap: wrap;
+  }
+
+  .top-nav {
+    justify-content: flex-start;
+    margin-bottom: 12px;
   }
 
   .search-row {

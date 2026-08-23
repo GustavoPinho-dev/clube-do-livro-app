@@ -24,7 +24,13 @@ from dotenv import load_dotenv
 import requests as requests_lib
 
 from fetch_books import search_and_normalize, get_and_normalize_volume
-from db import init_db, save_book, get_book_detail, get_book_detail_by_source_id
+from db import (
+    init_db,
+    save_book,
+    get_book_detail,
+    get_book_detail_by_source_id,
+    get_books_by_ids,
+)
 from reading_list import (
     add_book_to_list,
     rate_book,
@@ -36,6 +42,18 @@ from reading_list import (
     remove_quote_from_book,
     list_quotes,
     STATUSES,
+)
+from custom_lists import (
+    init_db as init_lists_db,
+    create_custom_list,
+    rename_custom_list,
+    delete_custom_list,
+    list_custom_lists,
+    get_custom_list_meta,
+    add_book_to_custom_list,
+    remove_book_from_custom_list,
+    get_custom_list_book_ids,
+    get_custom_lists_for_book,
 )
 import sqlite3
 
@@ -97,6 +115,7 @@ def api_get_book(book_id):
 
     livro = _normalize_book_response(livro)
     livro["quotes"] = list_quotes(book_id)
+    livro["custom_lists"] = get_custom_lists_for_book(book_id)
     return jsonify(livro)
 
 
@@ -114,6 +133,7 @@ def api_get_volume(source_id):
     if livro is not None:
         livro = _normalize_book_response(livro)
         livro["quotes"] = list_quotes(livro["book_id"])
+        livro["custom_lists"] = get_custom_lists_for_book(livro["book_id"])
         return jsonify(livro)
 
     # Não está salvo ainda -> busca direto na Google Books
@@ -137,6 +157,7 @@ def api_get_volume(source_id):
     })
     livro = _normalize_book_response(livro)
     livro["quotes"] = []  # ainda não salvo -> não pode ter citações registradas
+    livro["custom_lists"] = []  # idem para listas personalizadas
     return jsonify(livro)
 
 
@@ -271,7 +292,90 @@ def api_remove_quote(quote_id):
     return jsonify({"ok": True})
 
 
+@app.route("/api/custom-lists")
+def api_custom_lists():
+    """Lista todas as listas personalizadas, com a contagem de livros em cada uma."""
+    init_lists_db()
+    return jsonify(list_custom_lists())
+
+
+@app.route("/api/custom-lists", methods=["POST"])
+def api_create_custom_list():
+    """Cria uma lista personalizada. Corpo: {"name": "...", "description": "..." (opcional)}"""
+    data = request.get_json(silent=True) or {}
+    init_lists_db()
+
+    try:
+        list_id = create_custom_list(data.get("name", ""), data.get("description"))
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+
+    return jsonify({"list_id": list_id}), 201
+
+
+@app.route("/api/custom-lists/<int:list_id>")
+def api_get_custom_list(list_id):
+    """Detalhe de uma lista personalizada, com os livros já montados."""
+    init_lists_db()
+    meta = get_custom_list_meta(list_id)
+
+    if meta is None:
+        return jsonify({"error": f"Lista (id={list_id}) não encontrada."}), 404
+
+    book_ids = get_custom_list_book_ids(list_id)
+    meta["books"] = get_books_by_ids(book_ids)
+    return jsonify(meta)
+
+
+@app.route("/api/custom-lists/<int:list_id>", methods=["PATCH"])
+def api_update_custom_list(list_id):
+    """Renomeia/atualiza a descrição. Corpo: {"name": "..." e/ou "description": "..."}"""
+    data = request.get_json(silent=True) or {}
+
+    try:
+        rename_custom_list(list_id, name=data.get("name"), description=data.get("description"))
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+
+    return jsonify({"ok": True})
+
+
+@app.route("/api/custom-lists/<int:list_id>", methods=["DELETE"])
+def api_delete_custom_list(list_id):
+    delete_custom_list(list_id)
+    return jsonify({"ok": True})
+
+
+@app.route("/api/custom-lists/<int:list_id>/books", methods=["POST"])
+def api_add_book_to_custom_list(list_id):
+    """Adiciona um livro à lista. Corpo: {"book_id": 123}"""
+    data = request.get_json(silent=True) or {}
+    book_id = data.get("book_id")
+
+    if not isinstance(book_id, int):
+        return jsonify({"error": "book_id é obrigatório e deve ser um inteiro."}), 400
+
+    # Confirma que o livro existe em books.db antes de vincular -- como os
+    # bancos são arquivos separados, não há FOREIGN KEY garantindo isso.
+    if get_book_detail(book_id) is None:
+        return jsonify({"error": f"Livro id={book_id} não encontrado."}), 404
+
+    try:
+        add_book_to_custom_list(list_id, book_id)
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 404
+
+    return jsonify({"ok": True})
+
+
+@app.route("/api/custom-lists/<int:list_id>/books/<int:book_id>", methods=["DELETE"])
+def api_remove_book_from_custom_list(list_id, book_id):
+    remove_book_from_custom_list(list_id, book_id)
+    return jsonify({"ok": True})
+
+
 if __name__ == "__main__":
     init_db()
+    init_lists_db()
     port = int(os.environ.get("API_PORT", 5001))
     app.run(host="0.0.0.0", debug=True, port=port)
