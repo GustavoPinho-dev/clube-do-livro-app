@@ -6,9 +6,13 @@ Cria o schema SQLite e insere/atualiza (upsert) os livros normalizados
 vindos de fetch_books.py.
 
 Schema (protótipo, mas já relacional):
-    books           -> dados do livro
-    authors         -> autores (nome único)
-    book_authors    -> tabela de junção N:N entre books e authors
+    books              -> dados do livro
+    authors            -> autores (nome único)
+    book_authors       -> tabela de junção N:N entre books e authors
+    user_lists         -> status/nota/datas/resenha (a "leitura" pessoal)
+    book_quotes        -> citações marcadas pelo usuário
+    custom_lists       -> listas personalizadas (ex: "Favoritos")
+    custom_list_books  -> tabela de junção N:N entre custom_lists e books
 """
 
 import sqlite3
@@ -63,6 +67,20 @@ CREATE TABLE IF NOT EXISTS book_quotes (
     quote TEXT NOT NULL,
     page INTEGER,
     created_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS custom_lists (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL UNIQUE,
+    description TEXT,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS custom_list_books (
+    list_id INTEGER NOT NULL REFERENCES custom_lists(id) ON DELETE CASCADE,
+    book_id INTEGER NOT NULL REFERENCES books(id) ON DELETE CASCADE,
+    added_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (list_id, book_id)
 );
 """
 

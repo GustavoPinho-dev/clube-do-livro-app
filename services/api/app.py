@@ -44,7 +44,6 @@ from reading_list import (
     STATUSES,
 )
 from custom_lists import (
-    init_db as init_lists_db,
     create_custom_list,
     rename_custom_list,
     delete_custom_list,
@@ -295,7 +294,7 @@ def api_remove_quote(quote_id):
 @app.route("/api/custom-lists")
 def api_custom_lists():
     """Lista todas as listas personalizadas, com a contagem de livros em cada uma."""
-    init_lists_db()
+    init_db()
     return jsonify(list_custom_lists())
 
 
@@ -303,7 +302,7 @@ def api_custom_lists():
 def api_create_custom_list():
     """Cria uma lista personalizada. Corpo: {"name": "...", "description": "..." (opcional)}"""
     data = request.get_json(silent=True) or {}
-    init_lists_db()
+    init_db()
 
     try:
         list_id = create_custom_list(data.get("name", ""), data.get("description"))
@@ -316,7 +315,7 @@ def api_create_custom_list():
 @app.route("/api/custom-lists/<int:list_id>")
 def api_get_custom_list(list_id):
     """Detalhe de uma lista personalizada, com os livros já montados."""
-    init_lists_db()
+    init_db()
     meta = get_custom_list_meta(list_id)
 
     if meta is None:
@@ -355,8 +354,9 @@ def api_add_book_to_custom_list(list_id):
     if not isinstance(book_id, int):
         return jsonify({"error": "book_id é obrigatório e deve ser um inteiro."}), 400
 
-    # Confirma que o livro existe em books.db antes de vincular -- como os
-    # bancos são arquivos separados, não há FOREIGN KEY garantindo isso.
+    # Confirma que o livro existe antes de vincular -- dá um erro mais claro
+    # (404 com mensagem) do que deixar a FK de custom_list_books estourar
+    # um IntegrityError genérico lá na frente.
     if get_book_detail(book_id) is None:
         return jsonify({"error": f"Livro id={book_id} não encontrado."}), 404
 
@@ -376,6 +376,5 @@ def api_remove_book_from_custom_list(list_id, book_id):
 
 if __name__ == "__main__":
     init_db()
-    init_lists_db()
     port = int(os.environ.get("API_PORT", 5001))
     app.run(host="0.0.0.0", debug=True, port=port)

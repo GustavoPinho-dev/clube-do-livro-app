@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Leituras — Catálogo de Leituras</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,600;1,600&family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;500&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="style.css">
+</head>
+<body data-page="leituras">
+  <div class="wrap">
+
+    <div id="site-nav"></div>
+
+    <header class="ledger-header">
+      <p class="ledger-eyebrow">Fichário pessoal · vol. 1</p>
+      <h1 class="ledger-title">Leituras</h1>
+      <p class="ledger-sub">Seus livros organizados por gaveta: quero ler, lendo e lido.</p>
+    </header>
+
+    <div id="connection-banner"></div>
+
+    <section aria-label="Lista de leitura">
+      <div class="drawers" role="tablist" id="drawer-tabs">
+        <button class="drawer-tab active" role="tab" data-status="">Todos</button>
+        <button class="drawer-tab" role="tab" data-status="quero_ler">Quero ler</button>
+        <button class="drawer-tab" role="tab" data-status="lendo">Lendo</button>
+        <button class="drawer-tab" role="tab" data-status="lido">Lido</button>
+      </div>
+      <div class="drawer-panel" id="list-panel" aria-live="polite"></div>
+    </section>
+
+  </div>
+
+  <script src="config.js"></script>
+  <script src="common.js"></script>
+  <script src="nav.js"></script>
+  <script src="leituras.js"></script>
+</body>
+</html>

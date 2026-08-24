@@ -4,58 +4,20 @@ custom_lists.py
 Gerencia listas de leitura personalizadas, com nomes escolhidos pelo
 usuário (ex: "Favoritos de verão", "Para reler", "Indicações de amigos").
 
-Diferente de user_lists (que fica em books.db e representa o status
-quero_ler/lendo/lido -- uma gaveta fixa por livro), aqui um livro pode
-estar em quantas listas personalizadas quiser, e as listas em si são
-criadas livremente pelo usuário.
+Diferente de user_lists (que representa o status quero_ler/lendo/lido --
+uma gaveta fixa por livro), aqui um livro pode estar em quantas listas
+personalizadas quiser, e as listas em si são criadas livremente pelo
+usuário.
 
-Por pedido explícito, esses dados ficam em um arquivo SQLite PRÓPRIO
-(book_lists.db), separado do books.db. Isso significa que não dá pra
-usar FOREIGN KEY do SQLite apontando para a tabela `books` (ela mora em
-outro arquivo/conexão) -- então a integridade referencial de book_id é
-garantida "na mão": antes de adicionar um livro a uma lista, a camada
-de API confirma que ele existe em books.db chamando db.get_book_detail.
+Vive no mesmo books.db que o resto da pipeline (schema definido em
+db.py), com FOREIGN KEY de verdade para `books(id)` -- se um livro for
+apagado, ele some automaticamente de todas as listas personalizadas
+(ON DELETE CASCADE), sem precisar de checagem manual.
 """
 
 import sqlite3
-from contextlib import contextmanager
 
-DB_PATH = "book_lists.db"
-
-
-SCHEMA = """
-CREATE TABLE IF NOT EXISTS custom_lists (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL UNIQUE,
-    description TEXT,
-    created_at TEXT DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE TABLE IF NOT EXISTS custom_list_books (
-    list_id INTEGER NOT NULL REFERENCES custom_lists(id) ON DELETE CASCADE,
-    book_id INTEGER NOT NULL,   -- id de books.id em books.db (banco separado, sem FK)
-    added_at TEXT DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY (list_id, book_id)
-);
-"""
-
-
-@contextmanager
-def get_connection(db_path: str = DB_PATH):
-    conn = sqlite3.connect(db_path)
-    conn.execute("PRAGMA foreign_keys = ON")
-    conn.row_factory = sqlite3.Row
-    try:
-        yield conn
-        conn.commit()
-    finally:
-        conn.close()
-
-
-def init_db(db_path: str = DB_PATH):
-    """Cria o schema de book_lists.db caso ainda não exista."""
-    with get_connection(db_path) as conn:
-        conn.executescript(SCHEMA)
+from db import get_connection, DB_PATH
 
 
 # ---------------------------------------------------------------------
@@ -139,16 +101,19 @@ def get_list_meta(conn, list_id: int) -> dict | None:
 def add_book(conn, list_id: int, book_id: int):
     """
     Adiciona um livro a uma lista (idempotente: se já estiver lá, não faz
-    nada). Não valida se o livro existe em books.db -- isso é feito pela
-    camada de API, que tem acesso aos dois bancos.
+    nada). A FK em custom_list_books.book_id garante que o livro precisa
+    existir em `books` -- se não existir, o INSERT falha com IntegrityError.
     """
     if get_list_meta(conn, list_id) is None:
         raise ValueError(f"lista (id={list_id}) não encontrada.")
 
-    conn.execute(
-        "INSERT OR IGNORE INTO custom_list_books (list_id, book_id) VALUES (?, ?)",
-        (list_id, book_id),
-    )
+    try:
+        conn.execute(
+            "INSERT OR IGNORE INTO custom_list_books (list_id, book_id) VALUES (?, ?)",
+            (list_id, book_id),
+        )
+    except sqlite3.IntegrityError:
+        raise ValueError(f"livro (id={book_id}) não encontrado.")
 
 
 def remove_book(conn, list_id: int, book_id: int):
@@ -233,13 +198,27 @@ def get_custom_lists_for_book(book_id: int, db_path: str = DB_PATH) -> list[dict
 
 
 if __name__ == "__main__":
-    # Demonstração rápida
+    # Demonstração rápida (cria livros de exemplo primeiro, já que agora
+    # a FK exige que eles existam antes de entrar numa lista personalizada)
+    from db import init_db, save_books
+
     init_db()
+    save_books([
+        {"source_id": "demo1", "title": "Livro de exemplo 1", "authors": ["Autor A"]},
+        {"source_id": "demo2", "title": "Livro de exemplo 2", "authors": ["Autor B"]},
+    ])
+
+    with get_connection() as conn:
+        ids = [
+            row["id"]
+            for row in conn.execute("SELECT id FROM books WHERE source_id IN ('demo1', 'demo2')")
+        ]
+
     list_id = create_custom_list("Favoritos de verão", "Leituras leves para as férias")
     print(f"Lista criada com id={list_id}")
 
-    add_book_to_custom_list(list_id, book_id=1)
-    add_book_to_custom_list(list_id, book_id=2)
+    for book_id in ids:
+        add_book_to_custom_list(list_id, book_id)
     print("Livros na lista:", get_custom_list_book_ids(list_id))
 
     print("Todas as listas:", list_custom_lists())
