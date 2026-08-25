@@ -54,6 +54,12 @@ from custom_lists import (
     get_custom_list_book_ids,
     get_custom_lists_for_book,
 )
+from book_club import (
+    add_book_club_idea,
+    remove_book_club_idea,
+    list_book_club_ideas,
+    update_book_club_idea,
+)
 import sqlite3
 
 load_dotenv()
@@ -371,6 +377,73 @@ def api_add_book_to_custom_list(list_id):
 @app.route("/api/custom-lists/<int:list_id>/books/<int:book_id>", methods=["DELETE"])
 def api_remove_book_from_custom_list(list_id, book_id):
     remove_book_from_custom_list(list_id, book_id)
+    return jsonify({"ok": True})
+
+
+@app.route("/api/book-club/ideas")
+def api_book_club_ideas():
+    """Lista ideias do clube do livro. Query: ?order_by=votes|date."""
+    order_by = request.args.get("order_by", "votes")
+    init_db()
+
+    try:
+        return jsonify(list_book_club_ideas(order_by=order_by))
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+
+
+@app.route("/api/book-club/ideas", methods=["POST"])
+def api_add_book_club_idea():
+    """Adiciona uma ideia. Corpo: {"book_id": 123, "note": "...", "suggested_by": "...", "votes": 0}."""
+    data = request.get_json(silent=True) or {}
+    book_id = data.get("book_id")
+
+    if not isinstance(book_id, int):
+        return jsonify({"error": "book_id é obrigatório e deve ser um inteiro."}), 400
+
+    init_db()
+    try:
+        idea_id = add_book_club_idea(
+            book_id,
+            note=data.get("note"),
+            suggested_by=data.get("suggested_by"),
+            votes=data.get("votes", 0),
+        )
+    except ValueError as e:
+        message = str(e)
+        status = 404 if "livro" in message and "não encontrado" in message else 400
+        return jsonify({"error": message}), status
+
+    return jsonify({"idea_id": idea_id}), 201
+
+
+@app.route("/api/book-club/ideas/<int:idea_id>", methods=["PATCH"])
+def api_update_book_club_idea(idea_id):
+    """Atualiza observação/votos de uma ideia. Corpo: {"note": "...", "votes": 3}."""
+    data = request.get_json(silent=True) or {}
+    init_db()
+
+    try:
+        idea = update_book_club_idea(
+            idea_id,
+            note=data.get("note") if "note" in data else None,
+            votes=data.get("votes") if "votes" in data else None,
+        )
+    except ValueError as e:
+        message = str(e)
+        status = 404 if "ideia" in message and "não encontrada" in message else 400
+        return jsonify({"error": message}), status
+
+    return jsonify(idea)
+
+
+@app.route("/api/book-club/ideas/<int:idea_id>", methods=["DELETE"])
+def api_delete_book_club_idea(idea_id):
+    init_db()
+    removed = remove_book_club_idea(idea_id)
+    if not removed:
+        return jsonify({"error": f"Ideia (id={idea_id}) não encontrada."}), 404
+
     return jsonify({"ok": True})
 
 
