@@ -13,7 +13,6 @@ Schema (protótipo, mas já relacional):
     book_quotes        -> citações marcadas pelo usuário
     custom_lists       -> listas personalizadas (ex: "Favoritos")
     custom_list_books  -> tabela de junção N:N entre custom_lists e books
-    book_club_cycles   -> ciclos de leitura do clube do livro
 """
 
 import sqlite3
@@ -83,18 +82,6 @@ CREATE TABLE IF NOT EXISTS custom_list_books (
     added_at TEXT DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (list_id, book_id)
 );
-
-CREATE TABLE IF NOT EXISTS book_club_cycles (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    book_id INTEGER NOT NULL REFERENCES books(id) ON DELETE CASCADE,
-    title TEXT,                         -- nome/tema opcional do ciclo
-    start_date TEXT,                    -- data de início do ciclo (YYYY-MM-DD)
-    end_date TEXT,                      -- data de término do ciclo (YYYY-MM-DD)
-    status TEXT CHECK(status IN ('planned', 'current', 'finished')) DEFAULT 'planned',
-    conclusions TEXT,                   -- conclusões/anotações finais do clube
-    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-    updated_at TEXT DEFAULT CURRENT_TIMESTAMP
-);
 """
 
 
@@ -134,15 +121,6 @@ def init_db(db_path: str = DB_PATH):
             "started_at": "TEXT",
             "finished_at": "TEXT",
             "review": "TEXT",
-        })
-        _ensure_columns(conn, "book_club_cycles", {
-            "title": "TEXT",
-            "start_date": "TEXT",
-            "end_date": "TEXT",
-            "status": "TEXT CHECK(status IN ('planned', 'current', 'finished')) DEFAULT 'planned'",
-            "conclusions": "TEXT",
-            "created_at": "TEXT DEFAULT CURRENT_TIMESTAMP",
-            "updated_at": "TEXT DEFAULT CURRENT_TIMESTAMP",
         })
 
 
