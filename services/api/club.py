@@ -99,7 +99,7 @@ def conclude_session(conn, session_id: int, end_date: str = None, conclusions: s
 
     fim = _validate_date(end_date) or date.today().isoformat()
     if row["start_date"] and fim < row["start_date"]:
-        raise ValueError("a data de término não pode ser anterior à data de início.")
+        raise ValueError("A data de término não pode ser anterior à data de início.")
 
     conn.execute(
         """
@@ -132,7 +132,7 @@ def update_session(conn, session_id: int, start_date: str = None, end_date: str 
     novas_conclusoes = conclusions.strip() or None if conclusions is not None else row["conclusions"]
 
     if novo_inicio and novo_fim and novo_fim < novo_inicio:
-        raise ValueError("a data de término não pode ser anterior à data de início.")
+        raise ValueError("A data de término não pode ser anterior à data de início.")
 
     conn.execute(
         """

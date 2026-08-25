@@ -137,7 +137,7 @@ def set_reading_dates(conn, book_id: int, started_at: str = None, finished_at: s
     novo_finished = _validate_date(finished_at) if finished_at is not None else row["finished_at"]
 
     if novo_started and novo_finished and novo_finished < novo_started:
-        raise ValueError("a data de término não pode ser anterior à data de início.")
+        raise ValueError("A data de término não pode ser anterior à data de início.")
 
     conn.execute(
         """
