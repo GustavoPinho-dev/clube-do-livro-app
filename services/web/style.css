@@ -91,6 +91,109 @@ html, body {
   margin: 8px 0 0;
 }
 
+/* ---------- Navegação principal ---------- */
+
+.site-nav {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 18px;
+  background: var(--card);
+  border: 1px solid var(--line-strong);
+  border-top: 4px solid var(--forest);
+  box-shadow: var(--shadow);
+  padding: 14px 16px 0;
+  margin-bottom: 28px;
+}
+
+.site-nav::before {
+  content: "menu";
+  position: absolute;
+  top: -12px;
+  left: 14px;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--forest);
+  background: var(--paper);
+  border: 1px solid var(--line-strong);
+  padding: 1px 7px;
+}
+
+.site-nav-brand {
+  align-self: center;
+  font-family: var(--font-display);
+  font-size: clamp(1.15rem, 3vw, 1.45rem);
+  font-style: italic;
+  font-weight: 600;
+  color: var(--ink);
+  text-decoration: none;
+  padding-bottom: 12px;
+}
+
+.site-nav-brand:hover,
+.site-nav-brand:focus-visible {
+  color: var(--forest);
+}
+
+.site-nav-links {
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.site-nav-link {
+  position: relative;
+  top: 1px;
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  text-decoration: none;
+  background: var(--paper);
+  border: 1px solid var(--line-strong);
+  border-bottom: none;
+  padding: 8px 13px;
+  transition: background 0.12s ease, color 0.12s ease, transform 0.12s ease;
+}
+
+.site-nav-link:hover,
+.site-nav-link:focus-visible {
+  background: var(--brass-light);
+  color: var(--ink);
+  transform: translateY(-1px);
+}
+
+.site-nav-brand:focus-visible,
+.site-nav-link:focus-visible {
+  outline: 3px solid var(--brass);
+  outline-offset: 2px;
+}
+
+.site-nav-link.active {
+  background: var(--forest);
+  border-color: var(--forest-dark);
+  color: #f2ead2;
+  font-weight: 600;
+}
+
+.site-nav-link.active::after {
+  content: "";
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  bottom: 5px;
+  border-bottom: 1px dashed rgba(242, 234, 210, 0.65);
+}
+
 /* ---------- Busca ---------- */
 
 .search-slip {
@@ -1022,6 +1125,29 @@ html, body {
   .top-nav {
     justify-content: flex-start;
     margin-bottom: 12px;
+  }
+
+  .site-nav {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 10px;
+    padding: 14px 14px 0;
+  }
+
+  .site-nav-brand {
+    padding-bottom: 0;
+  }
+
+  .site-nav-links {
+    width: 100%;
+    gap: 3px;
+  }
+
+  .site-nav-link {
+    flex: 1;
+    justify-content: center;
+    padding: 8px 9px;
+    font-size: 10px;
   }
 
   .search-row {
