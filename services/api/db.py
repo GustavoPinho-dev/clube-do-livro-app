@@ -13,6 +13,8 @@ Schema (protótipo, mas já relacional):
     book_quotes        -> citações marcadas pelo usuário
     custom_lists       -> listas personalizadas (ex: "Favoritos")
     custom_list_books  -> tabela de junção N:N entre custom_lists e books
+    club_sessions      -> ciclos de leitura do clube do livro (1 livro por vez)
+    club_ideas         -> ideias de discussão vinculadas a um ciclo do clube
 """
 
 import sqlite3
@@ -81,6 +83,24 @@ CREATE TABLE IF NOT EXISTS custom_list_books (
     book_id INTEGER NOT NULL REFERENCES books(id) ON DELETE CASCADE,
     added_at TEXT DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (list_id, book_id)
+);
+
+CREATE TABLE IF NOT EXISTS club_sessions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    book_id INTEGER NOT NULL REFERENCES books(id) ON DELETE CASCADE,
+    status TEXT CHECK(status IN ('atual', 'concluida')) NOT NULL DEFAULT 'atual',
+    start_date TEXT,                 -- data de início do ciclo no clube (YYYY-MM-DD)
+    end_date TEXT,                   -- preenchida ao concluir o ciclo
+    conclusions TEXT,                -- anotações finais após o fim da leitura
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS club_ideas (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id INTEGER NOT NULL REFERENCES club_sessions(id) ON DELETE CASCADE,
+    idea TEXT NOT NULL,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP
 );
 """
 
@@ -256,6 +276,32 @@ def get_books_by_ids(book_ids: list[int], db_path: str = DB_PATH) -> list[dict]:
     por_id = {row["book_id"]: dict(row) for row in rows}
     # preserva a ordem recebida (ex: mais recentemente adicionado primeiro)
     return [por_id[bid] for bid in book_ids if bid in por_id]
+
+
+def list_all_books(db_path: str = DB_PATH) -> list[dict]:
+    """
+    Lista todos os livros já salvos no catálogo (independente de estarem
+    em alguma gaveta de leitura, lista personalizada, etc). Usado para
+    telas que precisam escolher um livro já existente, como o seletor de
+    'livro atual' do clube do livro.
+    """
+    with get_connection(db_path) as conn:
+        rows = conn.execute(
+            """
+            SELECT
+                b.id AS book_id,
+                b.title,
+                b.first_publish_year,
+                b.cover_url,
+                GROUP_CONCAT(DISTINCT a.name) AS authors
+            FROM books b
+            LEFT JOIN book_authors ba ON ba.book_id = b.id
+            LEFT JOIN authors a ON a.id = ba.author_id
+            GROUP BY b.id
+            ORDER BY b.created_at DESC
+            """
+        ).fetchall()
+        return [dict(row) for row in rows]
 
 
 def get_book_detail(book_id: int, db_path: str = DB_PATH) -> dict | None:

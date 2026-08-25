@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Detalhes do livro — Catálogo de Leituras</title>
+  <title>Clube do Livro — Catálogo de Leituras</title>
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -11,23 +11,31 @@
 
   <link rel="stylesheet" href="style.css">
 </head>
-<body>
+<body data-page="clube">
   <div class="wrap">
 
     <div id="site-nav"></div>
 
-    <a class="back-link" href="leituras.html">&larr; Voltar ao catálogo</a>
-
     <div id="connection-banner"></div>
-    <div id="detail-feedback"></div>
 
-    <section id="detail-container" aria-live="polite"></section>
+    <header class="page-header">
+      <h1 class="page-title">Clube do Livro</h1>
+    </header>
+
+    <div id="club-feedback"></div>
+
+    <section id="current-session-container" aria-live="polite"></section>
+
+    <section aria-label="Histórico do clube">
+      <h2 class="detail-section-title club-history-title">Histórico de leituras do clube</h2>
+      <div id="club-history-container"></div>
+    </section>
 
   </div>
 
   <script src="config.js"></script>
   <script src="common.js"></script>
   <script src="nav.js"></script>
-  <script src="book.js"></script>
+  <script src="clube.js"></script>
 </body>
 </html>

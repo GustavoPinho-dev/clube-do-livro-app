@@ -30,6 +30,7 @@ from db import (
     get_book_detail,
     get_book_detail_by_source_id,
     get_books_by_ids,
+    list_all_books,
 )
 from reading_list import (
     add_book_to_list,
@@ -53,6 +54,17 @@ from custom_lists import (
     remove_book_from_custom_list,
     get_custom_list_book_ids,
     get_custom_lists_for_book,
+)
+from club import (
+    get_current_club_session,
+    start_club_session,
+    conclude_club_session,
+    update_club_session,
+    delete_club_session,
+    get_club_history,
+    get_club_session,
+    add_club_idea,
+    remove_club_idea,
 )
 import sqlite3
 
@@ -371,6 +383,118 @@ def api_add_book_to_custom_list(list_id):
 @app.route("/api/custom-lists/<int:list_id>/books/<int:book_id>", methods=["DELETE"])
 def api_remove_book_from_custom_list(list_id, book_id):
     remove_book_from_custom_list(list_id, book_id)
+    return jsonify({"ok": True})
+
+
+@app.route("/api/books")
+def api_list_all_books():
+    """Todo o catálogo já salvo -- usado para escolher o livro atual do clube."""
+    init_db()
+    return jsonify(list_all_books())
+
+
+@app.route("/api/club/current")
+def api_club_current():
+    """O ciclo de leitura em andamento no clube, ou null se não houver nenhum."""
+    init_db()
+    return jsonify(get_current_club_session())
+
+
+@app.route("/api/club/sessions", methods=["POST"])
+def api_club_start():
+    """Inicia um novo ciclo. Corpo: {"book_id": 123, "start_date": "YYYY-MM-DD" (opcional)}"""
+    data = request.get_json(silent=True) or {}
+    book_id = data.get("book_id")
+
+    if not isinstance(book_id, int):
+        return jsonify({"error": "book_id é obrigatório e deve ser um inteiro."}), 400
+
+    if get_book_detail(book_id) is None:
+        return jsonify({"error": f"Livro id={book_id} não encontrado."}), 404
+
+    try:
+        session_id = start_club_session(book_id, start_date=data.get("start_date"))
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+
+    return jsonify({"session_id": session_id}), 201
+
+
+@app.route("/api/club/sessions/<int:session_id>/conclude", methods=["POST"])
+def api_club_conclude(session_id):
+    """Encerra o ciclo. Corpo: {"end_date": "YYYY-MM-DD" (opcional), "conclusions": "..." (opcional)}"""
+    data = request.get_json(silent=True) or {}
+
+    try:
+        conclude_club_session(
+            session_id,
+            end_date=data.get("end_date"),
+            conclusions=data.get("conclusions"),
+        )
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+
+    return jsonify({"ok": True})
+
+
+@app.route("/api/club/sessions/<int:session_id>", methods=["PATCH"])
+def api_club_update(session_id):
+    """
+    Edita um ciclo (atual ou já concluído). Corpo com qualquer combinação de:
+    {"start_date": "...", "end_date": "...", "conclusions": "..."}
+    """
+    data = request.get_json(silent=True) or {}
+
+    try:
+        update_club_session(
+            session_id,
+            start_date=data.get("start_date"),
+            end_date=data.get("end_date"),
+            conclusions=data.get("conclusions"),
+        )
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+
+    return jsonify({"ok": True})
+
+
+@app.route("/api/club/sessions/<int:session_id>", methods=["DELETE"])
+def api_club_delete(session_id):
+    delete_club_session(session_id)
+    return jsonify({"ok": True})
+
+
+@app.route("/api/club/sessions/<int:session_id>")
+def api_club_get_session(session_id):
+    sessao = get_club_session(session_id)
+    if sessao is None:
+        return jsonify({"error": f"ciclo (id={session_id}) não encontrado."}), 404
+    return jsonify(sessao)
+
+
+@app.route("/api/club/history")
+def api_club_history():
+    """Ciclos já concluídos, do mais recente para o mais antigo."""
+    init_db()
+    return jsonify(get_club_history())
+
+
+@app.route("/api/club/sessions/<int:session_id>/ideas", methods=["POST"])
+def api_club_add_idea(session_id):
+    """Adiciona uma ideia de discussão. Corpo: {"idea": "..."}"""
+    data = request.get_json(silent=True) or {}
+
+    try:
+        idea_id = add_club_idea(session_id, data.get("idea", ""))
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+
+    return jsonify({"idea_id": idea_id}), 201
+
+
+@app.route("/api/club/ideas/<int:idea_id>", methods=["DELETE"])
+def api_club_remove_idea(idea_id):
+    remove_club_idea(idea_id)
     return jsonify({"ok": True})
 
 
